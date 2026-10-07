@@ -54,7 +54,9 @@ tasks {
     patchPluginXml {
         pluginVersion.set(project.version.toString())
         sinceBuild.set("252")
-        untilBuild.set("")
+        // No upper bound: an empty until-build is refused by the Marketplace,
+        // an absent one means every later build.
+        untilBuild.set(provider { null })
     }
     buildSearchableOptions {
         enabled = false
