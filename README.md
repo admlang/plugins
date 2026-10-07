@@ -22,14 +22,14 @@ curl -fsSL https://raw.githubusercontent.com/admlang/adm/main/install.sh | sh
 ```
 
 The IntelliJ plugin is attached to each [ADM release](https://github.com/admlang/adm/releases/latest)
-as `adm-intellij-<version>.zip`: **Settings → Plugins → ⚙ → Install Plugin from Disk...**.
+as `adm-intellij.zip`: **Settings → Plugins → ⚙ → Install Plugin from Disk...**.
 
 The Visual Studio Code extension is on the
 [Marketplace](https://marketplace.visualstudio.com/items?itemName=admlang.adm): search for "ADM" in
 the Extensions view, or run `code --install-extension admlang.adm`. The same build is attached to
-each ADM release as `adm-vscode-<version>.vsix` for **Extensions: Install from VSIX...**.
+each ADM release as `adm-vscode.vsix` for **Extensions: Install from VSIX...**.
 
-Both are also released here, each under its own version
+Both are also released here, each under its own version and with the version in the file name
 ([releases](https://github.com/admlang/plugins/releases)).
 
 ## Build
