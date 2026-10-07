@@ -1,0 +1,18 @@
+<idea-plugin package="org.adm.intellij.debugger">
+	<extensions defaultExtensionNs="cidr.debugger">
+		<languageSupport
+				language="ADM"
+				implementationClass="org.adm.intellij.debugger.ADMDebuggerLanguageSupport"
+		/>
+		<editorsExtension
+				language="ADM"
+				implementationClass="org.adm.intellij.debugger.ADMDebuggerEditorsExtension"
+		/>
+		<lineBreakpointFileTypesProvider
+				implementation="org.adm.intellij.debugger.ADMLineBreakpointFileTypesProvider"
+		/>
+		<localVariablesFilterHandler
+				implementation="org.adm.intellij.debugger.ADMLocalVariablesFilterHandler"
+		/>
+	</extensions>
+</idea-plugin>

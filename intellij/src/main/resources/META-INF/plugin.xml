@@ -1,0 +1,161 @@
+<idea-plugin>
+    <id>org.adm.intellij</id>
+    <name>ADM Language</name>
+    <vendor url="https://example.com">ADM Project</vendor>
+    <description><![CDATA[
+      Provides foundational support for the ADM programming language, including the file type
+      definition, syntax highlighting, literal handling, and an LSP bridge (runs `adm lsp` from PATH for
+      completions, diagnostics, definitions/implementations, and folding).
+
+      <br/><br/>
+      Debugging: when JetBrains Native Debugging is available (plugin <code>com.intellij.nativeDebug</code>),
+      gutter actions can start an LLDB debug session for ADM applications/tests using DWARF + <code>#line</code>
+      source mapping back to <code>.adm</code> files.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.execution</depends>
+    <depends>com.intellij.modules.lsp</depends>
+    <depends>com.intellij.modules.ultimate</depends>
+    <depends config-file="adm-debugger.xml" optional="true">com.intellij.nativeDebug</depends>
+    <!-- Generate › Copyright and Code › Update Copyright for ADM files. -->
+    <depends config-file="adm-copyright.xml" optional="true">com.intellij.copyright</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="org.adm.intellij.settings.ADMSettingsState"/>
+        <!-- parentId="language" puts this under Settings | Languages & Frameworks
+             rather than the Other Settings catch-all. -->
+        <applicationConfigurable
+                parentId="language"
+                instance="org.adm.intellij.settings.ADMSettingsConfigurable"
+                displayName="ADM"
+                id="org.adm.intellij.settings"/>
+
+        <fileType name="ADM" language="ADM" extensions="adm" implementationClass="org.adm.intellij.lang.ADMFileType"/>
+        <lang.parserDefinition language="ADM" implementationClass="org.adm.intellij.lang.ADMParserDefinition"/>
+        <lang.syntaxHighlighterFactory language="ADM" implementationClass="org.adm.intellij.highlighting.ADMSyntaxHighlighterFactory"/>
+        <colorSettingsPage implementation="org.adm.intellij.highlighting.ADMColorSettingsPage"/>
+        <lang.braceMatcher language="ADM" implementationClass="org.adm.intellij.lang.ADMBraceMatcher"/>
+        <lang.commenter language="ADM" implementationClass="org.adm.intellij.lang.ADMCommenter"/>
+        <lang.foldingBuilder language="ADM" implementationClass="org.adm.intellij.lang.ADMFoldingBuilder"/>
+        <lang.psiStructureViewFactory language="ADM" implementationClass="org.adm.intellij.structure.ADMStructureViewFactory"/>
+        <completion.contributor language="ADM" implementationClass="org.adm.intellij.lang.ADMCompletionContributor"/>
+        <annotator language="ADM" implementationClass="org.adm.intellij.lang.ADMAnnotator"/>
+        <runLineMarkerContributor language="ADM" implementationClass="org.adm.intellij.run.ADMRunLineMarkerProvider"/>
+        <configurationType implementation="org.adm.intellij.run.ADMRunConfigurationType"/>
+        <runConfigurationProducer implementation="org.adm.intellij.run.ADMRunConfigurationProducer"/>
+        <!-- Handles the Debug executor for ADM run configurations. Without a real
+             runner the Debug tool window's Rerun has nothing to re-enter. -->
+        <programRunner implementation="org.adm.intellij.run.ADMDebugProgramRunner"/>
+        <!-- "Implements X" on types and "Implemented by" on interfaces, fed
+             by the server's adm/implements. Conformance is structural, so a
+             text scan of the body cannot know it: the old scanner read the
+             identifiers inside method signatures as embedded interfaces. -->
+        <codeInsight.lineMarkerProvider language="ADM" implementationClass="org.adm.intellij.navigation.ADMConformanceLineMarkerProvider"/>
+        <enterHandlerDelegate implementation="org.adm.intellij.editing.ADMEnterHandler"/>
+        <copyPastePreProcessor implementation="org.adm.intellij.editing.ADMCopyPastePreProcessor"/>
+        <platform.lsp.serverSupportProvider implementation="org.adm.intellij.lsp.ADMLspServerSupportProvider"/>
+        <!-- "N usages" above declarations. The platform's own usages code
+             vision resolves through PSI, which is flat for ADM, so its hint
+             was a dead click; this one counts and lists via the LSP. -->
+        <codeInsight.daemonBoundCodeVisionProvider implementation="org.adm.intellij.codevision.ADMUsagesCodeVisionProvider"/>
+        <!-- "tested in N tests" beside the usages: a click jumps to the test,
+             or offers the list with the most direct test first. -->
+        <codeInsight.daemonBoundCodeVisionProvider implementation="org.adm.intellij.codevision.ADMTestsCodeVisionProvider"/>
+        <!-- Shift+F6. The platform rename needs a named PSI element to anchor
+             on; ADM resolution lives behind the LSP, so this handler drives
+             textDocument/rename and applies the returned workspace edit. -->
+        <renameHandler implementation="org.adm.intellij.refactoring.ADMRenameHandler"/>
+        <!-- Ctrl+B / Ctrl+click / F3. The platform LSP client has its own
+             handler, but lsp4ij registers one first for every language and
+             answers empty for files it does not serve, which ends the action.
+             Ours runs before it and asks textDocument/definition directly. -->
+        <gotoDeclarationHandler id="ADMGotoDeclarationHandler"
+                                implementation="org.adm.intellij.navigation.ADMGotoDeclarationHandler"
+                                order="first, before LSPGotoDeclarationHandler"/>
+        <!-- Serves the platform Show Usages popup / Find tool window for
+             ADMSearchTarget: usages come from textDocument/references. -->
+        <searcher forClass="com.intellij.find.usages.api.UsageSearchParameters"
+                  implementationClass="org.adm.intellij.search.ADMUsageSearcher"/>
+        <!-- Live service information for a running ADM process, fed by the
+             std.ide IDE service over the ADM_IDE_PORT socket the run
+             configuration exports. -->
+        <toolWindow id="ADM" anchor="bottom" icon="/icons/adm.svg"
+                    factoryClass="org.adm.intellij.ide.ADMToolWindowFactory"/>
+        <!-- ADM editors open with doc comments rendered (Settings › Languages › ADM). -->
+        <editorFactoryListener implementation="org.adm.intellij.documentation.ADMDocRenderDefault"/>
+        <!-- `*_test.adm` files are test sources: green in the project view. -->
+        <testSourcesFilter implementation="org.adm.intellij.structure.ADMTestSourcesFilter"/>
+        <!-- Ctrl+click is deliberately left to the platform's LSP client: it
+             already resolves go-to-definition correctly, and intercepting the
+             gesture to add "usages on a declaration" broke navigation outright.
+             Usages live on their own action instead, below. -->
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="ADM" displayType="BALLOON" isLogByDefault="true"/>
+        <!-- "Show in ADM Documentation" in the hover card's corner menu. -->
+        <documentationActionProvider implementation="org.adm.intellij.ide.ADMDocumentationActionProvider"/>
+        <!-- The adm-doc:// link behind the Documentation icon in every hover card's header row. -->
+        <platform.backend.documentation.linkHandler implementation="org.adm.intellij.ide.ADMDocumentationLinkHandler"/>
+        <!-- "Render documentation comments": the `//` run above a declaration drawn as
+             formatted text, with @author / @see / @since rows, and the gutter pencil to edit. -->
+        <platform.backend.documentation.inlineDocumentationProvider implementation="org.adm.intellij.documentation.ADMInlineDocumentationProvider"/>
+        <!-- The adm-see:// links of a rendered comment's See Also row. -->
+        <platform.backend.documentation.linkHandler implementation="org.adm.intellij.documentation.ADMSeeAlsoLinkHandler"/>
+    </extensions>
+
+    <actions>
+        <action id="ADM.ShowDocumentation" class="org.adm.intellij.ide.ADMShowDocumentationAction"
+                text="Show in ADM Documentation" description="Open the ADM tool window's Documentation tab on the symbol at the caret"
+                icon="AllIcons.Toolwindows.Documentation">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="GotoDeclaration"/>
+        </action>
+        <action id="ADM.FormatFile" class="org.adm.intellij.actions.ADMFormatFileAction" text="Format ADM File">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+
+        <!-- Usage list for ADM, driven by the language server rather than PSI.
+             Takes over the Find Usages and Show Usages shortcuts inside ADM
+             files, where the platform's own search has nothing to work with. -->
+        <!-- use-shortcut-of inherits whatever the user's keymap assigns to
+             Find Usages (remaps included); no keystroke is hardcoded here. -->
+        <action id="ADM.ShowUsages" class="org.adm.intellij.actions.ADMShowUsagesAction"
+                text="Show ADM Usages" description="Find usages of the ADM symbol at the caret"
+                use-shortcut-of="FindUsages">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+
+        <!-- Alt+Insert inside a type body. Conformance is structural, so
+             "Implement" writes the members, not a clause. -->
+        <action id="ADM.GenerateConstructor" class="org.adm.intellij.actions.ADMGenerateConstructorAction" text="Constructor">
+            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        </action>
+        <action id="ADM.GenerateDestructor" class="org.adm.intellij.actions.ADMGenerateDestructorAction" text="Destructor">
+            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        </action>
+        <action id="ADM.ImplementInterface" class="org.adm.intellij.actions.ADMImplementAction" text="Implement Interface/Datatype...">
+            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        </action>
+        <!-- On a field line: rewrite it as a property block with the chosen accessors. -->
+        <action id="ADM.GenerateGetter" class="org.adm.intellij.actions.ADMGenerateGetterAction" text="Getter">
+            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        </action>
+        <action id="ADM.GenerateSetter" class="org.adm.intellij.actions.ADMGenerateSetterAction" text="Setter">
+            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        </action>
+        <action id="ADM.GenerateGetterSetter" class="org.adm.intellij.actions.ADMGenerateGetterSetterAction" text="Getter and Setter">
+            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        </action>
+
+        <group id="ADM.NewGroup" text="ADM" popup="true">
+            <add-to-group group-id="NewGroup" anchor="last"/>
+            <action id="ADM.NewApplication" class="org.adm.intellij.actions.ADMNewApplicationAction" text="Application"/>
+            <action id="ADM.NewModule" class="org.adm.intellij.actions.ADMNewModuleAction" text="Module"/>
+            <action id="ADM.NewLibrary" class="org.adm.intellij.actions.ADMNewLibraryAction" text="Library"/>
+            <action id="ADM.NewPlugin" class="org.adm.intellij.actions.ADMNewPluginAction" text="Plugin"/>
+        </group>
+    </actions>
+</idea-plugin>

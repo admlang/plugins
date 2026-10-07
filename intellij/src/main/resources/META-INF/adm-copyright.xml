@@ -1,0 +1,12 @@
+<idea-plugin>
+    <!-- Loaded only when the bundled Copyright plugin is enabled. -->
+    <extensions defaultExtensionNs="com.intellij">
+        <copyright.updater filetype="ADM" implementationClass="org.adm.intellij.copyright.ADMUpdateCopyrightsProvider"/>
+    </extensions>
+    <actions>
+        <action id="ADM.GenerateCopyright" class="org.adm.intellij.copyright.ADMInsertCopyrightAction"
+                text="Copyright" description="Insert the project's copyright notice at the top of the file">
+            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

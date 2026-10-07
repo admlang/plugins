@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- Tool-window icon (light theme): the ADM robot redrawn as a 1px line icon, like the IDE's own stripe icons. The filled logo (docs/assets/logo1.svg) merges its body and screen outlines into a blob at 16px. -->
+  <circle cx="8" cy="2" r="1.1" stroke="#6C707E" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 3.1V5" stroke="#6C707E" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="2.5" y="5" width="11" height="9.5" rx="2.5" stroke="#6C707E" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M0.75 8.5v3M15.25 8.5v3" stroke="#6C707E" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M4.75 10.75 6.25 9.25 7.75 10.75M8.25 10.75 9.75 9.25 11.25 10.75" stroke="#6C707E" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

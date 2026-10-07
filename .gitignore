@@ -1,0 +1,6 @@
+/intellij/.gradle/
+/intellij/build/
+/intellij/out/
+/intellij/.intellijPlatform/
+/intellij/.kotlin/
+/intellij/cidr/build/

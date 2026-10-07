@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- unionvariant: letter badge, centred on the 16px canvas so it sits level
+       with the label. Horizontal inset
+       keeps it off the label. Translucent fill reads on light and dark
+       backgrounds; the letter takes the strong tone to stay legible. -->
+  <rect x="2" y="2" width="12" height="12" rx="3"
+        fill="#8A63D2" fill-opacity="0.18" stroke="#6B48AE" stroke-width="1.1"/>
+  <text x="8" y="10.9" text-anchor="middle"
+        font-family="Inter, 'Segoe UI', 'DejaVu Sans', sans-serif"
+        font-size="9" font-weight="700" fill="#6B48AE">u</text>
+</svg>
