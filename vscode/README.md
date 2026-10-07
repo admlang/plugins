@@ -3,6 +3,14 @@
 Support for the [ADM language](https://adm-lang.dev) through `adm lsp`, the language server that
 ships with the compiler.
 
+## Install
+
+Search for "ADM" in the Extensions view, or:
+
+```sh
+code --install-extension admlang.adm
+```
+
 ## Requirements
 
 ADM installed, with `adm` on `PATH` or in `~/.adm/bin`:
@@ -74,6 +82,7 @@ npm run smoke      # talks to `adm lsp` without an editor
 npm run package    # adm-<version>.vsix
 ```
 
-Install the package with **Extensions: Install from VSIX...**, or `code --install-extension adm-0.1.0.vsix`.
-Released packages are on the [releases page](https://github.com/admlang/plugins/releases) as
-`adm-vscode-<version>.vsix`.
+Install a built package with **Extensions: Install from VSIX...**, or
+`code --install-extension adm-0.1.0.vsix`. Released packages are on the
+[Marketplace](https://marketplace.visualstudio.com/items?itemName=admlang.adm) and on the
+[releases page](https://github.com/admlang/plugins/releases) as `adm-vscode-<version>.vsix`.
