@@ -1,7 +1,9 @@
 <idea-plugin>
-    <id>org.adm.intellij</id>
+    <!-- The Marketplace refuses an id that contains "intellij". The id names
+         the plugin for updates: changing it makes a different plugin. -->
+    <id>dev.adm-lang.adm</id>
     <name>ADM Language</name>
-    <vendor url="https://example.com">ADM Project</vendor>
+    <vendor url="https://adm-lang.dev">ADM Project</vendor>
     <description><![CDATA[
       Provides foundational support for the ADM programming language, including the file type
       definition, syntax highlighting, literal handling, and an LSP bridge (runs `adm lsp` from PATH for

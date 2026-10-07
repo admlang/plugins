@@ -1,0 +1,205 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "ADM",
+	"scopeName": "source.adm",
+	"patterns": [
+		{ "include": "#comments" },
+		{ "include": "#strings" },
+		{ "include": "#regex" },
+		{ "include": "#annotations" },
+		{ "include": "#declarations" },
+		{ "include": "#keywords" },
+		{ "include": "#numbers" },
+		{ "include": "#types" },
+		{ "include": "#calls" },
+		{ "include": "#operators" }
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.double-slash.adm",
+					"match": "//.*$"
+				},
+				{ "include": "#block-comment" }
+			]
+		},
+		"block-comment": {
+			"name": "comment.block.adm",
+			"begin": "/\\*",
+			"end": "\\*/",
+			"patterns": [{ "include": "#block-comment" }]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"name": "string.quoted.triple.adm",
+					"begin": "\"\"\"",
+					"end": "\"\"\"",
+					"patterns": [{ "include": "#string-content" }]
+				},
+				{
+					"name": "string.quoted.double.adm",
+					"begin": "\"",
+					"end": "\"|$",
+					"patterns": [{ "include": "#string-content" }]
+				},
+				{
+					"name": "string.quoted.single.adm",
+					"match": "'(?:\\\\.|[^'\\\\])'"
+				}
+			]
+		},
+		"string-content": {
+			"patterns": [
+				{
+					"name": "constant.character.escape.adm",
+					"match": "\\\\(?:u\\{[0-9A-Fa-f]+\\}|x[0-9A-Fa-f]{2}|.)"
+				},
+				{
+					"name": "meta.interpolation.adm",
+					"begin": "\\{",
+					"beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.adm" } },
+					"end": "\\}",
+					"endCaptures": { "0": { "name": "punctuation.section.interpolation.end.adm" } },
+					"contentName": "source.adm.embedded",
+					"patterns": [{ "include": "source.adm" }]
+				}
+			]
+		},
+		"regex": {
+			"comment": "A slash starts a regex literal where a value may start: after an operator, an opening bracket, a comma, or a keyword that takes a value.",
+			"name": "string.regexp.adm",
+			"begin": "(?<=[=(,\\[{:!&|?]|\\breturn|\\bcase|\\bwhen|\\bunless|\\bin|^)\\s*(/)(?![/*\\s])",
+			"beginCaptures": { "1": { "name": "punctuation.definition.string.begin.adm" } },
+			"end": "(/)([a-z]*)|$",
+			"endCaptures": {
+				"1": { "name": "punctuation.definition.string.end.adm" },
+				"2": { "name": "keyword.other.flag.adm" }
+			},
+			"patterns": [
+				{ "name": "constant.character.escape.adm", "match": "\\\\." },
+				{
+					"name": "constant.other.character-class.set.adm",
+					"begin": "\\[",
+					"end": "\\]",
+					"patterns": [{ "name": "constant.character.escape.adm", "match": "\\\\." }]
+				}
+			]
+		},
+		"annotations": {
+			"name": "entity.name.function.decorator.adm",
+			"match": "@[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"
+		},
+		"declarations": {
+			"patterns": [
+				{
+					"match": "\\b(application|library|plugin|module)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
+					"captures": {
+						"1": { "name": "keyword.declaration.unit.adm" },
+						"2": { "name": "entity.name.namespace.adm" }
+					}
+				},
+				{
+					"match": "\\b(type|struct|datatype|interface|enum|union|service|component|view|style)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+					"captures": {
+						"1": { "name": "keyword.declaration.type.adm" },
+						"2": { "name": "entity.name.type.adm" }
+					}
+				},
+				{
+					"match": "\\b(def)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+					"captures": {
+						"1": { "name": "keyword.declaration.function.adm" },
+						"2": { "name": "entity.name.function.adm" }
+					}
+				},
+				{
+					"match": "\\b(check)\\s+(?=\")",
+					"captures": { "1": { "name": "keyword.declaration.check.adm" } }
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.adm",
+					"match": "\\b(if|else|when|unless|for|forall|every|empty|break|finish|switch|match|select|where|case|continue|default|return|yield|await|defer)\\b"
+				},
+				{
+					"name": "keyword.control.error.adm",
+					"match": "\\b(fail|try|onerror|recover|assert|expects|provides|begin|rollback|transaction)\\b"
+				},
+				{
+					"name": "storage.modifier.adm",
+					"match": "\\b(partial|internal|atomic|weak|async|cuda|sql|infix|meta|export)\\b"
+				},
+				{
+					"name": "keyword.declaration.adm",
+					"match": "\\b(let|const|def|use|application|library|plugin|module|check|view|style|component|datatype|service|type|union|interface|enum|struct)\\b"
+				},
+				{
+					"name": "keyword.operator.word.adm",
+					"match": "\\b(as|is|in|new|dispose)\\b"
+				},
+				{
+					"name": "variable.language.self.adm",
+					"match": "\\bself\\b"
+				},
+				{
+					"name": "constant.language.adm",
+					"match": "\\b(true|false|none)\\b"
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"name": "constant.numeric.hex.adm",
+					"match": "\\b0[xX][0-9A-Fa-f_]+\\b"
+				},
+				{
+					"name": "constant.numeric.binary.adm",
+					"match": "\\b0[bB][01_]+\\b"
+				},
+				{
+					"name": "constant.numeric.octal.adm",
+					"match": "\\b0[oO][0-7_]+\\b"
+				},
+				{
+					"comment": "A number, with a duration or a unit written right after it: 5ms, 2h, 10(min), 2.5(t/s).",
+					"match": "\\b([0-9][0-9_]*(?:\\.[0-9][0-9_]*)?(?:[eE][+-]?[0-9]+)?)(ns|us|ms|s|min|h|d|w)?\\b",
+					"captures": {
+						"1": { "name": "constant.numeric.adm" },
+						"2": { "name": "keyword.other.unit.adm" }
+					}
+				}
+			]
+		},
+		"types": {
+			"patterns": [
+				{
+					"name": "support.type.primitive.adm",
+					"match": "\\b(u?int(?:8|16|32|64|128)?|bigint|float(?:16|32|64|128)?|complex(?:32|64|128)|bool|string|char|byte|duration|regex|error|any|anydata|array|map|channel|vec(?:2|4|8|16|32|64|128)|mask(?:2|4|8|16|32|64|128))\\b"
+				},
+				{
+					"comment": "A name that starts with a capital letter is a type by convention; the language server's semantic tokens say for certain.",
+					"name": "entity.name.type.adm",
+					"match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+				}
+			]
+		},
+		"calls": {
+			"match": "\\b([a-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+			"captures": { "1": { "name": "entity.name.function.call.adm" } }
+		},
+		"operators": {
+			"patterns": [
+				{
+					"name": "keyword.operator.adm",
+					"match": "\\?\\?|:=|<-|=>|\\.\\.\\.|::|&&|\\|\\||==|!=|<=|>=|<<|>>|\\*\\*|[-+*/%&|^~<>=!?]=?"
+				}
+			]
+		}
+	}
+}

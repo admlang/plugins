@@ -1,0 +1,237 @@
+{
+  "name": "adm",
+  "displayName": "ADM",
+  "description": "ADM language support: diagnostics, navigation, completion, formatting and tests, through the adm language server.",
+  "version": "0.1.0",
+  "publisher": "admlang",
+  "license": "Apache-2.0",
+  "homepage": "https://adm-lang.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/admlang/plugins.git",
+    "directory": "vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/admlang/adm/issues"
+  },
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Testing"
+  ],
+  "keywords": [
+    "adm",
+    "language server"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/*.adm"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "adm",
+        "aliases": [
+          "ADM",
+          "adm"
+        ],
+        "extensions": [
+          ".adm"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/adm-light.svg",
+          "dark": "./icons/adm-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "adm",
+        "scopeName": "source.adm",
+        "path": "./syntaxes/adm.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[adm]": {
+        "editor.insertSpaces": false,
+        "editor.detectIndentation": false,
+        "editor.defaultFormatter": "admlang.adm",
+        "editor.semanticHighlighting.enabled": true
+      }
+    },
+    "configuration": {
+      "title": "ADM",
+      "properties": {
+        "adm.path": {
+          "type": "string",
+          "default": "adm",
+          "scope": "machine-overridable",
+          "markdownDescription": "The `adm` program to run. A bare name is looked up on `PATH`, then in `~/.adm/bin`."
+        },
+        "adm.lib": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Where the prelude and the standard library are, passed as `ADM_LIB`. Empty leaves it to `adm` (`~/.adm/lib`)."
+        },
+        "adm.env": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "scope": "machine-overridable",
+          "markdownDescription": "Environment variables for every `adm` the extension starts: the language server, tasks and tests (`ADM_CACHE`, `ADM_CLANG`, ...)."
+        },
+        "adm.lsp.logProtocol": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Start the language server with `--log-protocol`: every request and response goes to the \"ADM Language Server\" output."
+        },
+        "adm.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces what the editor and the language server say to each other."
+        },
+        "adm.test.arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra arguments for `adm test` when tests run from the Testing view (`--release`, `--no-cache`)."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "adm.restartServer",
+        "title": "Restart Language Server",
+        "category": "ADM"
+      },
+      {
+        "command": "adm.run",
+        "title": "Run Application",
+        "category": "ADM",
+        "icon": "$(play)"
+      },
+      {
+        "command": "adm.build",
+        "title": "Build",
+        "category": "ADM"
+      },
+      {
+        "command": "adm.check",
+        "title": "Check",
+        "category": "ADM"
+      },
+      {
+        "command": "adm.test",
+        "title": "Run Tests",
+        "category": "ADM"
+      },
+      {
+        "command": "adm.lint",
+        "title": "Lint",
+        "category": "ADM"
+      },
+      {
+        "command": "adm.showOutput",
+        "title": "Show Language Server Output",
+        "category": "ADM"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "adm.run",
+          "when": "resourceLangId == adm",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "adm.run",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "adm.build",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "adm.check",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "adm.test",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "adm.lint",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "taskDefinitions": [
+      {
+        "type": "adm",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "enum": [
+              "run",
+              "build",
+              "check",
+              "test",
+              "lint",
+              "fmt"
+            ],
+            "description": "The adm command to run."
+          },
+          "dir": {
+            "type": "string",
+            "description": "The folder of the application or library, relative to the workspace folder. The workspace folder itself when left out."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extra arguments for the command."
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p .",
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test": "tsc -p tsconfig.test.json && node --test out-test/test/*.test.js",
+    "smoke": "node test/lsp-smoke.js",
+    "package": "npm run check && node esbuild.js --production && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "~1.88.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}
