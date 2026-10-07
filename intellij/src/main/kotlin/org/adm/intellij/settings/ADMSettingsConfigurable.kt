@@ -17,7 +17,6 @@ class ADMSettingsConfigurable : Configurable {
     private var lldbExeField: TextFieldWithBrowseButton? = null
     private var backendCombo: ComboBox<ADMBackend>? = null
     private var logProtocolBox: javax.swing.JCheckBox? = null
-    private var renderDocsBox: javax.swing.JCheckBox? = null
     private var lintEditorBox: javax.swing.JCheckBox? = null
 
     override fun getDisplayName(): String = "ADM"
@@ -68,8 +67,6 @@ class ADMSettingsConfigurable : Configurable {
 
         val logProtocol = javax.swing.JCheckBox("Log LSP protocol traffic to the IDE log")
         logProtocolBox = logProtocol
-        val renderDocs = javax.swing.JCheckBox("Render documentation comments by default")
-        renderDocsBox = renderDocs
         val lintEditor = javax.swing.JCheckBox("Show lint findings in the editor")
         lintEditorBox = lintEditor
 
@@ -87,7 +84,6 @@ class ADMSettingsConfigurable : Configurable {
         lldb.text = state.lldbExecutablePath
         backend.selectedItem = ADMBackend.fromId(state.backend)
         logProtocol.isSelected = state.logLspProtocol
-        renderDocs.isSelected = state.renderDocComments
         lintEditor.isSelected = state.lintInEditor
 
         component = panel {
@@ -100,7 +96,6 @@ class ADMSettingsConfigurable : Configurable {
                 .comment("Passed to `adm` as <code>--backend</code> when building, running, testing and debugging.")
             row { cell(logProtocol) }
                 .comment("Runs <code>adm lsp --log-protocol</code>. Verbose; restart the IDE or reopen a file to apply.")
-            row { cell(renderDocs) }
                 .comment("Opens ADM files with <code>//</code> doc comments shown formatted; the gutter pencil toggles one comment, Ctrl+Alt+Q the whole file. Applies to files opened from now on.")
             row { cell(lintEditor) }
                 .comment("The language server runs <code>adm lint</code> on the open files: findings show as warnings and weak warnings with Alt+Enter fixes. Checks switched off on the ADM tool window's Lint tab are skipped. Restart the language server to apply.")
@@ -117,7 +112,6 @@ class ADMSettingsConfigurable : Configurable {
             (lldbExeField?.text ?: "") != state.lldbExecutablePath ||
             selectedBackend().id != ADMBackend.fromId(state.backend).id ||
             (logProtocolBox?.isSelected ?: false) != state.logLspProtocol ||
-            (renderDocsBox?.isSelected ?: true) != state.renderDocComments ||
             (lintEditorBox?.isSelected ?: true) != state.lintInEditor
     }
 
@@ -133,7 +127,6 @@ class ADMSettingsConfigurable : Configurable {
         state.lldbExecutablePath = lldbExeField?.text ?: ""
         state.backend = selectedBackend().id
         state.logLspProtocol = logProtocolBox?.isSelected ?: false
-        state.renderDocComments = renderDocsBox?.isSelected ?: true
         state.lintInEditor = lintEditorBox?.isSelected ?: true
     }
 
@@ -146,7 +139,6 @@ class ADMSettingsConfigurable : Configurable {
         lldbExeField?.text = state.lldbExecutablePath
         backendCombo?.selectedItem = ADMBackend.fromId(state.backend)
         logProtocolBox?.isSelected = state.logLspProtocol
-        renderDocsBox?.isSelected = state.renderDocComments
         lintEditorBox?.isSelected = state.lintInEditor
     }
 

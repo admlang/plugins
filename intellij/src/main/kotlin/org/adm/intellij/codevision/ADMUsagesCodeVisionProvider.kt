@@ -22,8 +22,8 @@ import org.adm.intellij.search.ADMUsageSearch
  * the ADM parser definition yields a flat tree -- so its hint rendered but a
  * click had nothing to search and silently did nothing. This provider gets its
  * counts from the language server's `textDocument/codeLens` (one request for
- * the whole file) and a click opens the platform's Show Usages popup through
- * the ADM search target.
+ * the whole file) and a click opens the usage list of
+ * [org.adm.intellij.search.ADMUsageSearch].
  */
 class ADMUsagesCodeVisionProvider : DaemonBoundCodeVisionProvider {
 

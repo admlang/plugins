@@ -13,9 +13,9 @@ import org.adm.intellij.search.ADMUsageSearch
  *
  * ADM has no PSI to speak of -- the parser definition yields a flat tree and
  * real resolution lives in the compiler behind the LSP -- so the platform's
- * PSI-driven Find Usages has nothing to search. This opens the same Show
- * Usages popup through an [org.adm.intellij.search.ADMSearchTarget], which
- * resolves through `textDocument/references`.
+ * PSI-driven Find Usages has nothing to search. This opens
+ * [org.adm.intellij.search.ADMUsageSearch]'s list, which resolves through
+ * `textDocument/references`.
  */
 class ADMShowUsagesAction : AnAction(), DumbAware {
 

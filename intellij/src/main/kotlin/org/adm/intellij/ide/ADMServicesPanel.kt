@@ -368,57 +368,82 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 			thread?.interrupt()
 		}
 
+		// `adm run` builds before it starts the program, and a large
+		// application builds for longer than any fixed wait: the port is
+		// tried until it answers, for as long as the process lives (stop()
+		// ends it). A program that `adm run --watch` or `--hot` restarts
+		// closes the connection and binds the port again, so a lost
+		// connection goes back to waiting instead of ending the session.
 		private fun run() {
-			var socket: Socket? = null
 			try {
-				// The service binds shortly after process start; retry briefly.
-				var attempts = 0
-				while (running && socket == null) {
-					try {
-						val s = Socket()
-						s.connect(InetSocketAddress("127.0.0.1", port), 1000)
-						socket = s
-					} catch (e: Exception) {
-						if (++attempts > 20) throw e
-						Thread.sleep(500)
-					}
-				}
-				val s = socket ?: return
-				val writer = OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8)
-				val reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
-				ApplicationManager.getApplication().invokeLater {
-					if (client === this) setStatus("Connected to 127.0.0.1:$port")
-				}
 				while (running) {
-					val listLine = request(writer, reader, "list") ?: break
-					val list = gson.fromJson(listLine, WireList::class.java)
-					if (list?.kind == "list") {
-						ApplicationManager.getApplication().invokeLater {
-							if (client === this) onList(list)
+					val socket = connect() ?: return
+					try {
+						serve(socket)
+					} catch (e: InterruptedException) {
+						throw e
+					} catch (_: Exception) {
+						// The program went away; wait for it to come back.
+					} finally {
+						try {
+							socket.close()
+						} catch (_: Exception) {
 						}
 					}
-					val selected = widgetsFor
-					if (selected != null) {
-						val snapLine = request(writer, reader, "snapshot $selected") ?: break
-						val snap = gson.fromJson(snapLine, JsonObject::class.java)
-						if (snap?.get("kind")?.asString == "snapshot") {
-							ApplicationManager.getApplication().invokeLater {
-								if (client === this) onSnapshot(snap)
-							}
-						}
-					}
-					Thread.sleep(1000)
+					status("Waiting for the program on 127.0.0.1:$port…")
+					Thread.sleep(500)
 				}
 			} catch (_: InterruptedException) {
-			} catch (e: Exception) {
-				ApplicationManager.getApplication().invokeLater {
-					if (client === this) setStatus("Disconnected: ${e.message ?: e.javaClass.simpleName}")
-				}
-			} finally {
+			}
+		}
+
+		private fun status(text: String) {
+			ApplicationManager.getApplication().invokeLater {
+				if (client === this) setStatus(text)
+			}
+		}
+
+		private fun connect(): Socket? {
+			var told = false
+			while (running) {
 				try {
-					socket?.close()
-				} catch (_: Exception) {
+					val s = Socket()
+					s.connect(InetSocketAddress("127.0.0.1", port), 1000)
+					return s
+				} catch (_: java.io.IOException) {
+					if (!told) {
+						told = true
+						status("Waiting for the program on 127.0.0.1:$port…")
+					}
+					Thread.sleep(500)
 				}
+			}
+			return null
+		}
+
+		private fun serve(s: Socket) {
+			val writer = OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8)
+			val reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
+			status("Connected to 127.0.0.1:$port")
+			while (running) {
+				val listLine = request(writer, reader, "list") ?: return
+				val list = gson.fromJson(listLine, WireList::class.java)
+				if (list?.kind == "list") {
+					ApplicationManager.getApplication().invokeLater {
+						if (client === this) onList(list)
+					}
+				}
+				val selected = widgetsFor
+				if (selected != null) {
+					val snapLine = request(writer, reader, "snapshot $selected") ?: return
+					val snap = gson.fromJson(snapLine, JsonObject::class.java)
+					if (snap?.get("kind")?.asString == "snapshot") {
+						ApplicationManager.getApplication().invokeLater {
+							if (client === this) onSnapshot(snap)
+						}
+					}
+				}
+				Thread.sleep(1000)
 			}
 		}
 

@@ -25,10 +25,13 @@ class ADMInlineDocumentationProvider : InlineDocumentationProvider {
 	 * range of its highlighter, which may have been widened to whole lines
 	 * or moved by edits, so the match is by overlap, the largest one wins.
 	 */
-	override fun findInlineDocumentation(file: PsiFile, textRange: TextRange): InlineDocumentation? =
-		inlineDocumentationItems(file)
-			.filter { it.documentationRange.intersects(textRange) }
-			.maxByOrNull { it.documentationRange.intersection(textRange)?.length ?: 0 }
+	override fun findInlineDocumentation(file: PsiFile, textRange: TextRange): InlineDocumentation? {
+		if (file.language != ADMLanguage) return null
+		return ADMDocComments.runs(file)
+			.filter { it.range.intersects(textRange) }
+			.maxByOrNull { it.range.intersection(textRange)?.length ?: 0 }
+			?.let { ADMInlineDocumentation(file, it) }
+	}
 }
 
 /** One rendered doc comment: its range, the declaration line below it, and the HTML. */

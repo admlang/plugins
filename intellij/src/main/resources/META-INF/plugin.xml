@@ -76,17 +76,11 @@
         <gotoDeclarationHandler id="ADMGotoDeclarationHandler"
                                 implementation="org.adm.intellij.navigation.ADMGotoDeclarationHandler"
                                 order="first, before LSPGotoDeclarationHandler"/>
-        <!-- Serves the platform Show Usages popup / Find tool window for
-             ADMSearchTarget: usages come from textDocument/references. -->
-        <searcher forClass="com.intellij.find.usages.api.UsageSearchParameters"
-                  implementationClass="org.adm.intellij.search.ADMUsageSearcher"/>
         <!-- Live service information for a running ADM process, fed by the
              std.ide IDE service over the ADM_IDE_PORT socket the run
              configuration exports. -->
         <toolWindow id="ADM" anchor="bottom" icon="/icons/adm.svg"
                     factoryClass="org.adm.intellij.ide.ADMToolWindowFactory"/>
-        <!-- ADM editors open with doc comments rendered (Settings › Languages › ADM). -->
-        <editorFactoryListener implementation="org.adm.intellij.documentation.ADMDocRenderDefault"/>
         <!-- `*_test.adm` files are test sources: green in the project view. -->
         <testSourcesFilter implementation="org.adm.intellij.structure.ADMTestSourcesFilter"/>
         <!-- Ctrl+click is deliberately left to the platform's LSP client: it

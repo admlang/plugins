@@ -127,7 +127,7 @@ class ADMSecurityPanel(private val project: Project, parentDisposable: Disposabl
 			override fun customizeCellRenderer(tree: JTree, value: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean) {
 				when (val x = (value as? DefaultMutableTreeNode)?.userObject) {
 					is PermissionNode -> {
-						icon = if (x.observe) AllIcons.Nodes.Weblistener else AllIcons.Nodes.Padlock
+						icon = if (x.observe) AllIcons.General.InspectionsEye else AllIcons.Nodes.Padlock
 						append(x.permission)
 						if (x.description.isNotEmpty()) append("  ${x.description}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
 					}

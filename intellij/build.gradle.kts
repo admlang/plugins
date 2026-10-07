@@ -46,8 +46,20 @@ dependencies {
     intellijPlatform {
         intellijIdea("2025.3")
         bundledPlugin("com.intellij.copyright")
+        pluginVerifier()
     }
     runtimeOnly(project(":cidr"))
+}
+
+// `./gradlew verifyPlugin` runs the Plugin Verifier the Marketplace runs on
+// an upload: internal, deprecated and missing API uses, against every IDE
+// release from since-build on (an API can turn internal in a later one).
+intellijPlatform {
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
 }
 
 tasks {

@@ -1,7 +1,6 @@
 package org.adm.intellij.ide
 
 import com.google.gson.JsonObject
-import com.intellij.codeInsight.documentation.DocumentationHtmlUtil
 import com.intellij.icons.AllIcons
 import com.intellij.lang.documentation.DocumentationMarkup
 import com.intellij.openapi.Disposable
@@ -109,12 +108,36 @@ class ADMDocumentationPanel(private val project: Project, parentDisposable: Disp
 		JBHtmlPaneStyleConfiguration.Builder().enableCodeBlocksBackground(true).enableInlineCodeBackground(true).build(),
 		JBHtmlPaneConfiguration.builder()
 			.iconResolver { name -> iconNamed(name) }
-			.customStyleSheetProvider { DocumentationHtmlUtil.getDocumentationPaneAdditionalCssRules() }
+			.customStyleSheetProvider { pageStyles() }
 			.build(),
 	).apply {
 		border = JBUI.Borders.empty(8, 12)
 		background = UIUtil.getPanelBackground()
 	}
+	/**
+	 * The rules a documentation page is laid out with: the classes of
+	 * [DocumentationMarkup] (definition, content, sections), spaced the way
+	 * the platform's documentation popup spaces them. The pane's border gives
+	 * the outer padding.
+	 */
+	private fun pageStyles(): javax.swing.text.html.StyleSheet {
+		val link = com.intellij.ui.ColorUtil.toHtmlColor(JBUI.CurrentTheme.Link.Foreground.ENABLED)
+		val label = com.intellij.ui.ColorUtil.toHtmlColor(UIUtil.getContextHelpForeground())
+		val gap = JBUI.scale(8)
+		val sheet = javax.swing.text.html.StyleSheet()
+		sheet.addRule("html { padding: 0; margin: 0 }")
+		sheet.addRule("body { padding: 0; margin: 0 }")
+		sheet.addRule("pre { white-space: pre-wrap }")
+		sheet.addRule("a { color: $link; text-decoration: none }")
+		sheet.addRule(".definition { padding: ${gap / 2}px 0 ${gap}px 0 }")
+		sheet.addRule(".definition pre { margin: 0; padding: 0 }")
+		sheet.addRule(".content { padding: 0; max-width: 100% }")
+		sheet.addRule(".bottom, .top { padding: ${gap / 2}px 0 ${gap / 2}px 0 }")
+		sheet.addRule(".sections { padding: 0; border-spacing: 0 }")
+		sheet.addRule(".section { color: $label; padding-right: 4px; white-space: nowrap }")
+		return sheet
+	}
+
 	private val pageScroll = JBScrollPane(pane).apply {
 		border = JBUI.Borders.empty()
 		viewport.background = UIUtil.getPanelBackground()

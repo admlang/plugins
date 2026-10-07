@@ -27,12 +27,6 @@ class ADMSettingsState : PersistentStateComponent<ADMSettingsState> {
     // when diagnosing why a language feature returns nothing.
     var logLspProtocol: Boolean = false
 
-    // Opens ADM editors with doc comments rendered (the formatted view with
-    // the gutter pencil) instead of raw `//` lines, whatever the IDE-wide
-    // "Render documentation comments" setting says. The per-editor toggle
-    // still switches an open file either way.
-    var renderDocComments: Boolean = true
-
     // Asks the language server to lint the open files as it type-checks
     // them, so lint findings show in the editor and the Problems view with
     // Alt+Enter fixes. The checks switched off on the Lint tab are skipped.

@@ -33,7 +33,7 @@ class ADMLspServerDescriptor(project: Project) : LspServerDescriptor(project, "A
      * Find Usages action was enabled in ADM files and won the keymap's
      * shortcut over Show ADM Usages -- and its search came back "Nothing
      * found in 'Project Files'" because it has no PSI to anchor on. Usages
-     * go through ADMSearchTarget instead (see org.adm.intellij.search).
+     * go through ADMUsageSearch instead (see org.adm.intellij.search).
      */
     override val lspFindReferencesSupport: LspFindReferencesSupport? = null
 
@@ -55,11 +55,13 @@ class ADMLspServerDescriptor(project: Project) : LspServerDescriptor(project, "A
      * The one-line message stays the message (Problems view, status bar).
      */
     override val lspDiagnosticsSupport: LspDiagnosticsSupport = object : LspDiagnosticsSupport() {
-        override fun getMessage(diagnostic: Diagnostic): String =
-            diagnostic.message.lineSequence().firstOrNull()?.trim() ?: diagnostic.message
+        override fun getMessage(diagnostic: Diagnostic): String {
+            val message = messageOf(diagnostic)
+            return message.lineSequence().firstOrNull()?.trim() ?: message
+        }
 
         override fun getTooltip(diagnostic: Diagnostic): String {
-            val lines = diagnostic.message.lines().map { it.trim() }.filter { it.isNotEmpty() }
+            val lines = messageOf(diagnostic).lines().map { it.trim() }.filter { it.isNotEmpty() }
             val body = StringBuilder()
             lines.forEachIndexed { i, line ->
                 if (i > 0) body.append("<br>")
@@ -214,4 +216,17 @@ object ADMLintCodes {
         "assertless-test", "untested-export", "suite-file-without-suite", "prefer-lambda",
         "prefer-expects", "prefer-when", "prefer-junction", "prefer-empty-block",
     )
+}
+
+// The lsp4j an IDE bundles decides what Diagnostic.getMessage returns: a
+// String up to 2026.2, an Either of String and MarkupContent from 2026.3. A
+// direct call compiles against one of them and fails to link on the other, so
+// the getter is looked up by name.
+private val diagnosticMessage = Diagnostic::class.java.getMethod("getMessage")
+
+private fun messageOf(diagnostic: Diagnostic): String = when (val message = diagnosticMessage.invoke(diagnostic)) {
+    is String -> message
+    is org.eclipse.lsp4j.jsonrpc.messages.Either<*, *> ->
+        (message.left as? String) ?: (message.right as? org.eclipse.lsp4j.MarkupContent)?.value.orEmpty()
+    else -> message?.toString().orEmpty()
 }
