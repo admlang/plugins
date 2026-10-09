@@ -86,6 +86,13 @@ class ADMDocumentationPanel(private val project: Project, parentDisposable: Disp
 		val column: Int,
 		val type: String?,
 		val value: String?,
+		/** A component's `@input` member: passed unnamed (`value`), assignable by the component (`bind`). */
+		val valueInput: Boolean,
+		val bindInput: Boolean,
+		/** A component's `@state` field: others hear it change. */
+		val state: Boolean,
+		/** A component declared `@scoped`: in the tree for what it does, neither laid out nor drawn. */
+		val scoped: Boolean,
 		val implements: List<Ref>,
 		val implementedBy: List<Ref>,
 		val examples: List<Example>,
@@ -497,6 +504,10 @@ class ADMDocumentationPanel(private val project: Project, parentDisposable: Disp
 			column = x.int("column") ?: 0,
 			type = x.str("type"),
 			value = x.str("value"),
+			valueInput = x.bool("valueInput"),
+			bindInput = x.bool("bindInput"),
+			state = x.bool("state"),
+			scoped = x.bool("scoped"),
 			implements = parseRefs(x, "implements"),
 			implementedBy = parseRefs(x, "implementedBy"),
 			examples = parseExamples(x),
@@ -747,6 +758,20 @@ class ADMDocumentationPanel(private val project: Project, parentDisposable: Disp
 				content(b, group.firstNotNullOfOrNull { f -> f.doc?.takeIf { it.isNotBlank() } })
 			}
 		}
+		// A component's surface is what a view can give it, watch on it and
+		// hear from it: its inputs, its states and its events. The
+		// controller's other members are the component's own business and
+		// the model leaves them out.
+		for ((kind, name) in listOf("input" to "Inputs", "state" to "States", "emit" to "Emits")) {
+			val group = x.members.filter { it.kindName == kind }
+			if (group.isEmpty()) continue
+			sectionTitle(b, name)
+			for (m in group) {
+				definition(b, if (kind == "emit") declaration(m) ?: memberLine(listOf(m)) else memberLine(listOf(m)), null)
+				content(b, m.doc)
+				tags(b, m.tags, m.module)
+			}
+		}
 		val groups = linkedMapOf<String, MutableList<Symbol>>()
 		for (m in x.members) {
 			val group = when (m.kindName) {
@@ -788,8 +813,19 @@ class ADMDocumentationPanel(private val project: Project, parentDisposable: Disp
 		return when (m.kindName) {
 			"enum member" -> if (value != null) "$names = $value" else names
 			"property" -> listOfNotNull(names, type, "{ get set }").joinToString(" ")
+			"input", "state" -> listOfNotNull(inputAnnotation(m), if (m.state) "@state" else null, names, type, value?.let { "= $it" }).joinToString(" ")
+			// The model's type carries the parameters with their names; the
+			// recorded signature, without them, stands in.
+			"emit" -> "@emit() def $names" + (type ?: (m.signature ?: "").let { it.substringAfter("::", it) })
 			else -> listOfNotNull(names, type, value?.let { "= $it" }).joinToString(" ")
 		}
+	}
+
+	/** The `@input` annotation of a component's input as its flags spell it; null for a state that is no input. */
+	private fun inputAnnotation(m: Symbol): String? {
+		if (m.kindName != "input") return null
+		val flags = listOfNotNull(if (m.valueInput) "value = true" else null, if (m.bindInput) "bind = true" else null)
+		return if (flags.isEmpty()) "@input" else "@input(${flags.joinToString(", ")})"
 	}
 
 	/**
@@ -799,7 +835,9 @@ class ADMDocumentationPanel(private val project: Project, parentDisposable: Disp
 	 */
 	private fun typeDeclaration(x: Symbol): String {
 		if (x.kindName == "const" || x.kindName == "let") return valueDeclaration(x)
-		val head = declaration(x) ?: return fallbackDeclaration(x)
+		// A scoped component is marked on its card even when the source
+		// line could not be read (the model says so).
+		val head = (declaration(x) ?: fallbackDeclaration(x)).let { if (x.scoped && !it.contains("@scoped")) "@scoped\n$it" else it }
 		if (!x.isTypeLike) return head
 		val inner = x.members.filter { it.kindName in SHAPE_KINDS }.map { m -> "    " + memberLine(listOf(m)) }
 		if (inner.isEmpty()) return head
@@ -1074,9 +1112,9 @@ class ADMDocumentationPanel(private val project: Project, parentDisposable: Disp
 
 		private val TYPE_KINDS = setOf("type", "struct", "enum", "union", "interface", "datatype", "service", "component", "style", "view")
 		/** Members drawn inside a type's braces. */
-		private val SHAPE_KINDS = setOf("field", "enum member", "union variant", "property")
+		private val SHAPE_KINDS = setOf("field", "enum member", "union variant", "property", "input", "state", "emit")
 		/** Members rendered from the model's type and value rather than their source line. */
-		private val VALUE_KINDS = setOf("field", "enum member", "union variant", "const", "let")
+		private val VALUE_KINDS = setOf("field", "enum member", "union variant", "const", "let", "input", "state", "emit")
 		private val DECLARING_KEYWORDS = setOf("def", "type", "struct", "enum", "union", "interface", "datatype", "service", "component", "style", "view", "module", "meta")
 	}
 }
