@@ -19,6 +19,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
@@ -28,8 +29,12 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.swing.BoxLayout
 import javax.swing.DefaultListModel
+import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.ListSelectionModel
 import javax.swing.SwingConstants
@@ -43,6 +48,16 @@ private class WireMember {
 	var refreshMs: Long = 1000
 	var unit: String? = null
 }
+
+/** One entry of a `log` member (`IdeLogEntry` in std.ide). */
+private data class LogEntry(
+	val time: Long,
+	val level: String,
+	val source: String,
+	val at: String,
+	val message: String,
+	val fields: List<Pair<String, String>>,
+)
 
 private class WireService {
 	var name: String? = null
@@ -225,7 +240,15 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 		detailPanel.removeAll()
 		widgets = emptyMap()
 		widgetsFor = svc?.name
-		val members = svc?.members.orEmpty()
+		// Single values first, then tables and graphs, the log last: it is the tallest.
+		val members = svc?.members.orEmpty().sortedBy {
+			when (it.kind) {
+				"table" -> 1
+				"series" -> 2
+				"log" -> 3
+				else -> 0
+			}
+		}
 		if (svc == null || members.isEmpty()) {
 			detailHost.remove(detailScroll)
 			detailHost.emptyText.text = if (svc == null) "Select a service" else "This service publishes no IDE members"
@@ -236,7 +259,7 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 				val w = MemberWidget(m)
 				built[m.member ?: continue] = w
 				detailPanel.add(w.component)
-				detailPanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(10)))
+				detailPanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(8)))
 			}
 			widgets = built
 		}
@@ -262,12 +285,28 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 		private val tableModel = DefaultTableModel()
 		private val table = JBTable(tableModel)
 		private val series = SeriesGraph()
+		private val logModel = LogModel()
+		private val logList = JBList(logModel)
+		private var logScroll: JBScrollPane? = null
+		private var logEntries: List<LogEntry> = emptyList()
+		private var tableShown: Pair<List<String>, List<List<String>>>? = null
 		val component: JPanel = JPanel(BorderLayout())
 
 		init {
 			title.font = title.font.deriveFont(title.font.style or java.awt.Font.BOLD)
-			title.border = JBUI.Borders.emptyBottom(6)
-			component.add(title, BorderLayout.NORTH)
+			// A value sits on its label's line; a table, a graph or a log goes under it.
+			val header = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0))
+			header.isOpaque = false
+			header.add(title)
+			val single = meta.kind != "table" && meta.kind != "log"
+			if (single) {
+				header.add(javax.swing.Box.createHorizontalStrut(JBUI.scale(8)))
+				header.add(valueLabel)
+			}
+			if (meta.kind != "value" && meta.kind != "text" && meta.kind != "tree") {
+				header.border = JBUI.Borders.emptyBottom(6)
+			}
+			component.add(header, BorderLayout.NORTH)
 			when (meta.kind) {
 				"table" -> {
 					table.setShowGrid(false)
@@ -275,14 +314,29 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 					scroll.preferredSize = Dimension(400, JBUI.scale(140))
 					component.add(scroll, BorderLayout.CENTER)
 				}
-				"series" -> {
-					series.preferredSize = Dimension(400, JBUI.scale(80))
-					component.add(series, BorderLayout.CENTER)
-					component.add(valueLabel, BorderLayout.SOUTH)
+				"log" -> {
+					logList.cellRenderer = LogEntryRenderer()
+					logList.font = JBUI.Fonts.create(java.awt.Font.MONOSPACED, logList.font.size)
+					logList.emptyText.text = "No entries yet"
+					// Every row is one line of one font: a fixed height spares measuring each.
+					logList.fixedCellHeight = logList.getFontMetrics(logList.font).height + JBUI.scale(2)
+					val scroll = JBScrollPane(logList)
+					scroll.preferredSize = Dimension(400, JBUI.scale(240))
+					logScroll = scroll
+					component.add(scroll, BorderLayout.CENTER)
 				}
-				else -> component.add(valueLabel, BorderLayout.CENTER)
+				"series" -> {
+					series.preferredSize = Dimension(400, JBUI.scale(56))
+					component.add(series, BorderLayout.CENTER)
+				}
+				else -> {}
 			}
-			component.maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(if (meta.kind == "table") 190 else 130))
+			// Each widget is as tall as it needs; the log takes what is left of the panel.
+			val height = when (meta.kind) {
+				"log" -> Int.MAX_VALUE
+				else -> component.preferredSize.height
+			}
+			component.maximumSize = Dimension(Int.MAX_VALUE, height)
 			component.alignmentX = 0f
 		}
 
@@ -294,7 +348,32 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 					val rows = obj.arr("rows")?.map { row ->
 						row.asJsonArray.map { it.asString }.toTypedArray()
 					}?.toTypedArray() ?: emptyArray()
+					// Unchanged data is left alone: setting it again drops the selection, the
+					// scroll position and the column widths the user set.
+					val shown = columns.toList() to rows.map { it.toList() }
+					if (shown == tableShown) return
+					tableShown = shown
 					tableModel.setDataVector(rows, columns)
+				}
+				"log" -> {
+					val obj = value.takeIf { it.isJsonObject }?.asJsonObject ?: return
+					val entries = obj.arr("entries")?.mapNotNull { parseEntry(it) } ?: return
+					if (entries == logEntries) return
+					// The list follows the newest entry while it shows the end; once the user
+					// scrolls up it stays where it is until they scroll back down.
+					val bar = logScroll?.verticalScrollBar
+					val following = bar == null || logEntries.isEmpty() || bar.value + bar.visibleAmount >= bar.maximum - JBUI.scale(4)
+					val selected = logList.selectedValue
+					logEntries = entries
+					logModel.show(entries)
+					if (selected != null) logList.setSelectedValue(selected, false) else logList.clearSelection()
+					if (following && entries.isNotEmpty()) {
+						// Lay the new rows out now and move to the end in the same step, so no
+						// frame is painted at another position.
+						logScroll?.validate()
+						val end = logScroll?.verticalScrollBar
+						if (end != null) end.value = end.maximum
+					}
 				}
 				"series" -> {
 					val v = value.takeIf { it.isJsonPrimitive }?.asDouble ?: return
@@ -307,10 +386,97 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 			}
 		}
 
+		private fun parseEntry(element: com.google.gson.JsonElement): LogEntry? {
+			val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+			val fields = obj.arr("fields")?.mapNotNull { pair ->
+				val items = pair.takeIf { it.isJsonArray }?.asJsonArray ?: return@mapNotNull null
+				if (items.size() != 2) null else items[0].asString to items[1].asString
+			}.orEmpty()
+			return LogEntry(
+				time = obj.get("time")?.takeIf { it.isJsonPrimitive }?.asLong ?: 0L,
+				level = obj.str("level") ?: "log",
+				source = obj.str("source").orEmpty(),
+				at = obj.str("at").orEmpty(),
+				message = obj.str("message").orEmpty(),
+				fields = fields,
+			)
+		}
+
 		private fun suffix(): String = meta.unit?.takeIf { it.isNotEmpty() }?.let { " $it" } ?: ""
 
 		private fun formatValue(v: Double): String =
 			if (v == Math.floor(v) && !v.isInfinite()) v.toLong().toString() else "%.2f".format(v)
+	}
+
+	/**
+	 * The entries of a log member. A new answer replaces the rows in one step, so the list is
+	 * never shown empty in between and keeps its place.
+	 */
+	private class LogModel : javax.swing.AbstractListModel<LogEntry>() {
+		private var items: List<LogEntry> = emptyList()
+
+		override fun getSize(): Int = items.size
+
+		override fun getElementAt(index: Int): LogEntry = items[index]
+
+		fun show(entries: List<LogEntry>) {
+			val before = items.size
+			items = entries
+			val same = minOf(before, entries.size)
+			if (same > 0) fireContentsChanged(this, 0, same - 1)
+			if (entries.size > before) fireIntervalAdded(this, before, entries.size - 1)
+			if (entries.size < before) fireIntervalRemoved(this, entries.size, before - 1)
+		}
+	}
+
+	/**
+	 * Draws a log entry the way the console encoder of the Logging service does: time, level,
+	 * source, the fields, then the message; the call site follows on debug entries.
+	 */
+	private class LogEntryRenderer : ColoredListCellRenderer<LogEntry>() {
+		private val clock = DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.systemDefault())
+		private val dim = SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor.namedColor("Label.infoForeground", JBColor.GRAY))
+		private val fieldValue = SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor(Color(0x007A87), Color(0x4EC9C0)))
+		private val plain = SimpleTextAttributes.REGULAR_ATTRIBUTES
+		private val bold = SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES
+
+		override fun customizeCellRenderer(
+			list: JList<out LogEntry>,
+			value: LogEntry?,
+			index: Int,
+			selected: Boolean,
+			hasFocus: Boolean,
+		) {
+			val entry = value ?: return
+			font = list.font
+			append(clock.format(Instant.ofEpochMilli(entry.time)), dim)
+			append(" ")
+			append(levelTag(entry.level).padEnd(5), levelStyle(entry.level))
+			if (entry.source.isNotEmpty()) append(" " + entry.source, dim)
+			append("  ")
+			for ((name, text) in entry.fields) {
+				append("$name=", dim)
+				append("$text ", fieldValue)
+			}
+			if (entry.fields.isNotEmpty()) append(" ")
+			append(entry.message, if (entry.level == "error" || entry.level == "fatal") bold else plain)
+			if (entry.level == "debug" && entry.at.isNotEmpty()) append("  " + entry.at, dim)
+			toolTipText = entry.at.ifEmpty { null }
+		}
+
+		private fun levelTag(level: String): String = when (level) {
+			"warning" -> "WARN"
+			else -> level.uppercase()
+		}
+
+		private fun levelStyle(level: String): SimpleTextAttributes = when (level) {
+			"debug" -> plain
+			"info" -> SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor(Color(0x1F6FD0), Color(0x6CB6FF)))
+			"warning" -> SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor(Color(0xA36A00), Color(0xE0B040)))
+			"error" -> SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JBColor.RED)
+			"fatal" -> SimpleTextAttributes(Color(0xC62828), Color.WHITE, null, SimpleTextAttributes.STYLE_BOLD)
+			else -> bold
+		}
 	}
 
 	/** Minimal line graph over a ring buffer of samples. */
