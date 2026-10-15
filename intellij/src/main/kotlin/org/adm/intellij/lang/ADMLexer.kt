@@ -72,6 +72,10 @@ class ADMLexer : LexerBase() {
                 lexString(index)
                 return
             }
+            ch == '`' -> {
+                lexRawString(index)
+                return
+            }
             ch == '\'' -> {
                 lexChar(index)
                 return
@@ -226,6 +230,19 @@ class ADMLexer : LexerBase() {
                 continue
             }
             escaped = false
+            index++
+        }
+        setToken(ADMTokenTypes.STRING, index)
+    }
+
+    // A backtick string: its text up to the next backtick, over any number of
+    // lines, with no escapes and no interpolation.
+    private fun lexRawString(start: Int) {
+        var index = start + 1
+        while (index < endOffset && buffer[index] != '`') {
+            index++
+        }
+        if (index < endOffset) {
             index++
         }
         setToken(ADMTokenTypes.STRING, index)

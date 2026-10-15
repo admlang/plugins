@@ -39,6 +39,11 @@
 					"patterns": [{ "include": "#string-content" }]
 				},
 				{
+					"name": "string.quoted.other.raw.adm",
+					"begin": "`",
+					"end": "`"
+				},
+				{
 					"name": "string.quoted.double.adm",
 					"begin": "\"",
 					"end": "\"|$",
