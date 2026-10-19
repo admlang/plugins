@@ -29,6 +29,8 @@ class ADMDebugProgramRunner : ProgramRunner<RunnerSettings> {
 		// Only `adm run`/`adm test` produce a debuggable binary.
 		val subcommand = configuration.args.firstOrNull()?.trim()?.lowercase()
 		if (subcommand != "run" && subcommand != "test") return false
+		// A web build runs in the browser, which LLDB cannot attach to.
+		if (configuration.platform == ADMPlatform.WEB) return false
 		return nativeDebugAvailable()
 	}
 

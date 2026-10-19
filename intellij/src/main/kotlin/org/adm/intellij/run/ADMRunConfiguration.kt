@@ -38,6 +38,7 @@ class ADMRunConfiguration(
 	// [effectiveEnv], so a variable set here reaches the debugged program too.
 	var envVars: Map<String, String> = emptyMap()
 	var passParentEnv: Boolean = true
+	var platform: ADMPlatform = ADMPlatform.DEFAULT
 
 	/**
      * Environment for the launched process: the ADM tool variables
@@ -67,11 +68,12 @@ class ADMRunConfiguration(
 			return null
 		}
 
-		val runArgs = args
-		if (runArgs.isEmpty()) {
+		if (args.isEmpty()) {
 			Messages.showErrorDialog(project, "ADM run configuration has no arguments.", "ADM")
 			return null
 		}
+		val runArgs = platform.apply(args, envVars)
+		val web = platform == ADMPlatform.WEB
 
 		return object : CommandLineState(environment) {
 			override fun startProcess(): ProcessHandler {
@@ -85,8 +87,10 @@ class ADMRunConfiguration(
 				// entries from the editor apply to plain Run too, not only to
 				// the Debug path.
 				val env = LinkedHashMap(effectiveEnv())
-				val idePort = org.adm.intellij.ide.ADMInspect.pickFreePort()
-				env["ADM_IDE_PORT"] = idePort.toString()
+				// The IDE service panel talks to the program over a local TCP
+				// port, which a page cannot open: a web run goes without it.
+				val idePort = if (web) null else org.adm.intellij.ide.ADMInspect.pickFreePort()
+				if (idePort != null) env["ADM_IDE_PORT"] = idePort.toString()
 
 				val cmd = GeneralCommandLine(adm.toString())
 					.withWorkDirectory(workDir)
@@ -96,7 +100,7 @@ class ADMRunConfiguration(
 
 				return try {
 					val handler = KillableProcessHandler(cmd)
-					org.adm.intellij.ide.ADMInspect.register(handler, idePort)
+					if (idePort != null) org.adm.intellij.ide.ADMInspect.register(handler, idePort)
 					handler
 				} catch (t: Throwable) {
 					log.warn("Failed to start adm process", t)
@@ -117,6 +121,7 @@ class ADMRunConfiguration(
 		writeArgList(element, "admAppArg", appArgs)
 		EnvironmentVariablesComponent.writeExternal(element, envVars)
 		element.setAttribute("admPassParentEnv", passParentEnv.toString())
+		element.setAttribute("admPlatform", platform.id)
 	}
 
 	override fun readExternal(element: Element) {
@@ -128,6 +133,7 @@ class ADMRunConfiguration(
 		EnvironmentVariablesComponent.readExternal(element, loaded)
 		envVars = loaded
 		passParentEnv = element.getAttributeValue("admPassParentEnv")?.toBooleanStrictOrNull() ?: true
+		platform = ADMPlatform.fromId(element.getAttributeValue("admPlatform"))
 	}
 
 	private fun writeArgList(element: Element, name: String, values: List<String>) {
@@ -159,6 +165,7 @@ class ADMRunConfiguration(
 		private val argsField = RawCommandLineEditor()
 		private val appArgsField = RawCommandLineEditor()
 		private val envField = EnvironmentVariablesTextFieldWithBrowseButton()
+		private val platformField = com.intellij.openapi.ui.ComboBox(ADMPlatform.entries.toTypedArray())
 
 		override fun createEditor(): JComponent {
 			workDirField.addBrowseFolderListener(
@@ -221,6 +228,19 @@ class ADMRunConfiguration(
 			c.fill = java.awt.GridBagConstraints.HORIZONTAL
 			panel.add(envField, c)
 
+			c.gridx = 0
+			c.gridy = 4
+			c.weightx = 0.0
+			c.fill = java.awt.GridBagConstraints.NONE
+			c.insets = java.awt.Insets(0, 0, 6, 8)
+			panel.add(JLabel("Platform:"), c)
+
+			c.gridx = 1
+			c.weightx = 1.0
+			c.fill = java.awt.GridBagConstraints.NONE
+			platformField.toolTipText = "Native runs on this machine; Web builds with --os wasm, runs the program in the browser (tests in a headless one) and shows its output here."
+			panel.add(platformField, c)
+
 			return panel
 		}
 
@@ -230,6 +250,7 @@ class ADMRunConfiguration(
 			appArgsField.text = ParametersListUtil.join(s.appArgs)
 			envField.envs = s.envVars
 			envField.isPassParentEnvs = s.passParentEnv
+			platformField.selectedItem = s.platform
 		}
 
 		override fun applyEditorTo(s: ADMRunConfiguration) {
@@ -244,6 +265,7 @@ class ADMRunConfiguration(
 
 			s.envVars = LinkedHashMap(envField.envs)
 			s.passParentEnv = envField.isPassParentEnvs
+			s.platform = platformField.selectedItem as? ADMPlatform ?: ADMPlatform.DEFAULT
 		}
 	}
 }
