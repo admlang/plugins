@@ -83,6 +83,10 @@
                     factoryClass="org.adm.intellij.ide.ADMToolWindowFactory"/>
         <!-- `*_test.adm` files are test sources: green in the project view. -->
         <testSourcesFilter implementation="org.adm.intellij.structure.ADMTestSourcesFilter"/>
+        <!-- External Libraries: the ADM SDK (prelude, std) and the packages adm.lock pins,
+             as the compiler resolves them (adm env and adm list packages, as JSON). -->
+        <additionalLibraryRootsProvider implementation="org.adm.intellij.project.ADMLibraryRootsProvider"/>
+        <postStartupActivity implementation="org.adm.intellij.project.ADMExternalLibrariesStartup"/>
         <!-- Ctrl+click is deliberately left to the platform's LSP client: it
              already resolves go-to-definition correctly, and intercepting the
              gesture to add "usages on a declaration" broke navigation outright.

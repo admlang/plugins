@@ -34,6 +34,7 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import org.adm.intellij.ADMIcons
+import org.adm.intellij.project.ADMExternalLibraries
 import java.awt.BorderLayout
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
@@ -656,6 +657,7 @@ class ADMLibrariesPanel(private val project: Project, parentDisposable: Disposab
 			if (r.ok) {
 				notify("${lib.library} installed", NotificationType.INFORMATION)
 				listPackages(dir)
+				ADMExternalLibraries.getInstance(project).refresh()
 				show(View.Installed)
 			} else {
 				notify("adm get failed: ${r.failure()}", NotificationType.ERROR)
@@ -670,6 +672,7 @@ class ADMLibrariesPanel(private val project: Project, parentDisposable: Disposab
 		ADMCli.background(project, "Removing ${lib.library}", listOf("lib", "remove", lib.library, "--dir", dir), dir) { r ->
 			if (r.ok) {
 				listPackages(dir)
+				ADMExternalLibraries.getInstance(project).refresh()
 				show(View.Installed)
 			} else notify("adm lib remove failed: ${r.failure()}", NotificationType.ERROR)
 		}

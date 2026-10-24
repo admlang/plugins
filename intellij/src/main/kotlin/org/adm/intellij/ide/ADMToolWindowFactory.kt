@@ -17,6 +17,7 @@ import com.intellij.ui.content.ContentFactory
 import com.intellij.xdebugger.XDebugProcess
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerManagerListener
+import org.adm.intellij.project.ADMExternalLibraries
 import org.adm.intellij.run.ADMRunConfiguration
 
 /**
@@ -118,6 +119,9 @@ class ADMToolWindowFactory : ToolWindowFactory, DumbAware {
 			},
 		)
 
+		// Started before the refresh so it hears the units: a project that had
+		// no ADM files when it opened lists its libraries from here.
+		ADMExternalLibraries.getInstance(project)
 		workspace.refresh()
 	}
 

@@ -2,11 +2,13 @@ package org.adm.intellij.settings
 
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import javax.swing.JComponent
+import org.adm.intellij.project.ADMExternalLibraries
 
 class ADMSettingsConfigurable : Configurable {
     private var component: JComponent? = null
@@ -128,6 +130,10 @@ class ADMSettingsConfigurable : Configurable {
         state.backend = selectedBackend().id
         state.logLspProtocol = logProtocolBox?.isSelected ?: false
         state.lintInEditor = lintEditorBox?.isSelected ?: true
+        // Another adm or ADM_LIB can name another SDK.
+        for (project in ProjectManager.getInstance().openProjects) {
+            ADMExternalLibraries.ifCreated(project)?.refresh()
+        }
     }
 
     override fun reset() {
