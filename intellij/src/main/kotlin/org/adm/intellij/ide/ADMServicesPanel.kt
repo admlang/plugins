@@ -59,10 +59,30 @@ private data class LogEntry(
 	val fields: List<Pair<String, String>>,
 )
 
+/** An input of an action: its name, type (string, int, float, bool, duration, enum) and default as written. */
+internal class WireParam {
+	var name: String? = null
+	var type: String? = null
+	var choices: List<String>? = null
+	var default: String? = null
+}
+
+/** An action of a service's panel (`@ide(kind = IdeKind.Action)` in ADM code). */
+internal class WireAction {
+	var action: String? = null
+	var label: String? = null
+	var confirm: String? = null
+	var params: List<WireParam>? = null
+}
+
 private class WireService {
 	var name: String? = null
+	var short: String? = null
+	var description: String? = null
 	var status: String? = null
+	var lab: Boolean = false
 	var members: List<WireMember>? = null
+	var actions: List<WireAction>? = null
 }
 
 private class WireList {
@@ -97,10 +117,11 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 	private var services: List<WireService> = emptyList()
 	private var widgets: Map<String, MemberWidget> = emptyMap()
 	private var widgetsFor: String? = null
+	private var detailBuilt = false
 
 	/** One attached process. */
-	private inner class Session(val handler: ProcessHandler, val port: Int, val appName: String?) {
-		val client = Client(port)
+	private inner class Session(val handler: ProcessHandler, val endpoint: ADMEndpoint, val appName: String?) {
+		val client = Client(endpoint)
 	}
 
 	private val sessions = LinkedHashMap<ProcessHandler, Session>()
@@ -157,8 +178,8 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 	/** Whether a process of the application [appName] is attached. */
 	fun isRunning(appName: String): Boolean = sessions.values.any { it.appName == appName }
 
-	fun attach(handler: ProcessHandler, port: Int, appName: String?) {
-		val session = Session(handler, port, appName)
+	fun attach(handler: ProcessHandler, endpoint: ADMEndpoint, appName: String?) {
+		val session = Session(handler, endpoint, appName)
 		sessions[handler] = session
 		session.client.start()
 		showFor(ADMWorkspace.getInstance(project).selected)
@@ -198,7 +219,7 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 		if (next != null) {
 			add(splitter, BorderLayout.CENTER)
 			add(statusLabel, BorderLayout.SOUTH)
-			setStatus("Connecting to 127.0.0.1:${next.port}…")
+			setStatus("Connecting to 127.0.0.1:${next.endpoint.port}…")
 		}
 		revalidate()
 		repaint()
@@ -236,10 +257,11 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 
 	private fun rebuildDetail() {
 		val svc = selectedService()
-		if (svc?.name == widgetsFor && widgets.isNotEmpty()) return
+		if (svc?.name == widgetsFor && detailBuilt) return
 		detailPanel.removeAll()
 		widgets = emptyMap()
 		widgetsFor = svc?.name
+		detailBuilt = svc != null
 		// Single values first, then tables and graphs, the log last: it is the tallest.
 		val members = svc?.members.orEmpty().sortedBy {
 			when (it.kind) {
@@ -249,11 +271,32 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 				else -> 0
 			}
 		}
-		if (svc == null || members.isEmpty()) {
+		val actions = svc?.actions.orEmpty()
+		val hasLab = svc?.lab == true
+		if (svc == null || (members.isEmpty() && actions.isEmpty() && !hasLab)) {
 			detailHost.remove(detailScroll)
 			detailHost.emptyText.text = if (svc == null) "Select a service" else "This service publishes no IDE members"
 		} else {
 			if (detailScroll.parent !== detailHost) detailHost.add(detailScroll, BorderLayout.CENTER)
+			val service = svc.name.orEmpty()
+			if (actions.isNotEmpty() || hasLab) {
+				val bar = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, JBUI.scale(6), 0))
+				bar.isOpaque = false
+				bar.alignmentX = java.awt.Component.LEFT_ALIGNMENT
+				for (action in actions) {
+					val button = javax.swing.JButton(action.label ?: action.action ?: "?")
+					button.addActionListener { client?.let { ADMServiceActions.run(project, service, action, it) } }
+					bar.add(button)
+				}
+				if (hasLab) {
+					val button = javax.swing.JButton("Lab…")
+					button.toolTipText = "The conditions this service's calls meet in this run"
+					button.addActionListener { client?.let { ADMLabDialog(project, service, it).show() } }
+					bar.add(button)
+				}
+				detailPanel.add(bar)
+				detailPanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(8)))
+			}
 			val built = LinkedHashMap<String, MemberWidget>()
 			for (m in members) {
 				val w = MemberWidget(m)
@@ -516,11 +559,20 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 
 	/**
 	 * Socket client for one running process. One request in flight at a time;
-	 * polls `list` and, for the selected service, `snapshot` once a second.
+	 * opens with `hello <token>`, polls `list` and, for the selected service,
+	 * `snapshot` once a second, and runs the requests the panel queues
+	 * (actions, lab changes) between polls.
 	 */
-	private inner class Client(private val port: Int) {
+	internal inner class Client(private val endpoint: ADMEndpoint) {
+		private val port = endpoint.port
 		@Volatile private var running = true
 		private var thread: Thread? = null
+		private val queued = java.util.concurrent.LinkedBlockingDeque<Pair<String, (String?) -> Unit>>()
+
+		/** Sends [line] on the next turn of the poll loop; [answer] gets the reply on the EDT, null when the connection went away. */
+		fun enqueue(line: String, answer: (String?) -> Unit) {
+			queued.put(line to answer)
+		}
 
 		fun start() {
 			thread = Thread({ run() }, "ADM IDE inspector :$port").apply {
@@ -590,8 +642,23 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 		private fun serve(s: Socket) {
 			val writer = OutputStreamWriter(s.getOutputStream(), Charsets.UTF_8)
 			val reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
+			// The channel closes a connection whose first line does not carry
+			// the run's token; a program built before protocol 2 does not
+			// answer `hello` at all.
+			val hello = request(writer, reader, "hello ${endpoint.token}")
+			val greeting = hello?.let { gson.fromJson(it, JsonObject::class.java) }
+			if (greeting?.get("kind")?.asString != "hello") {
+				status("127.0.0.1:$port did not accept the connection: rebuild the program with this adm")
+				return
+			}
 			status("Connected to 127.0.0.1:$port")
 			while (running) {
+				while (true) {
+					val (line, answer) = queued.poll() ?: break
+					val reply = request(writer, reader, line)
+					ApplicationManager.getApplication().invokeLater { answer(reply) }
+					reply ?: return
+				}
 				val listLine = request(writer, reader, "list") ?: return
 				val list = gson.fromJson(listLine, WireList::class.java)
 				if (list?.kind == "list") {
@@ -609,7 +676,9 @@ class ADMServicesPanel(private val project: Project, parentDisposable: Disposabl
 						}
 					}
 				}
-				Thread.sleep(1000)
+				// Wait out the poll interval, or less when the panel queues a request.
+				val waiting = queued.poll(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+				if (waiting != null) queued.putFirst(waiting)
 			}
 		}
 

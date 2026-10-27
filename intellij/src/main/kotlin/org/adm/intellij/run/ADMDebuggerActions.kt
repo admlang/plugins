@@ -40,14 +40,14 @@ object ADMDebuggerActions {
 
 		val env = LinkedHashMap(configuration.effectiveEnv())
 		// The ADM tool window inspects the debuggee the same way it inspects a
-		// plain run: give the process an endpoint port and key it on the
-		// session's environment (the debug bridge owns the process handler).
-		val idePort = org.adm.intellij.ide.ADMInspect.pickFreePort()
-		env["ADM_IDE_PORT"] = idePort.toString()
+		// plain run: give the process an endpoint and key it on the session's
+		// environment (the debug bridge owns the process handler).
+		val endpoint = org.adm.intellij.ide.ADMInspect.newEndpoint()
+		endpoint.exportTo(env)
 		if (environment != null) {
-			org.adm.intellij.ide.ADMInspect.register(environment, idePort)
+			org.adm.intellij.ide.ADMInspect.register(environment, endpoint)
 		}
-		org.adm.intellij.ide.ADMInspect.setPendingDebugPort(idePort)
+		org.adm.intellij.ide.ADMInspect.setPendingDebugEndpoint(endpoint)
 		when (args.first().trim().lowercase()) {
 			"run" -> debugApplication(project, configuration.name, workDir, args, configuration.appArgs, env, environment)
 			"test" -> {

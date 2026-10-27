@@ -88,8 +88,8 @@ class ADMToolWindowFactory : ToolWindowFactory, DumbAware {
 			ExecutionManager.EXECUTION_TOPIC,
 			object : ExecutionListener {
 				override fun processStarted(executorId: String, env: ExecutionEnvironment, handler: ProcessHandler) {
-					val port = ADMInspect.portOf(handler) ?: ADMInspect.portOf(env) ?: return
-					servicesPanel.attach(handler, port, appNameOf(env.runProfile))
+					val endpoint = ADMInspect.endpointOf(handler) ?: ADMInspect.endpointOf(env) ?: return
+					servicesPanel.attach(handler, endpoint, appNameOf(env.runProfile))
 				}
 
 				override fun processTerminated(executorId: String, env: ExecutionEnvironment, handler: ProcessHandler, exitCode: Int) {
@@ -107,9 +107,9 @@ class ADMToolWindowFactory : ToolWindowFactory, DumbAware {
 			XDebuggerManager.TOPIC,
 			object : XDebuggerManagerListener {
 				override fun processStarted(debugProcess: XDebugProcess) {
-					val port = ADMInspect.takePendingDebugPort() ?: return
+					val endpoint = ADMInspect.takePendingDebugEndpoint() ?: return
 					val handler = debugProcess.processHandler
-					servicesPanel.attach(handler, port, appNameOf(debugProcess.session.runProfile))
+					servicesPanel.attach(handler, endpoint, appNameOf(debugProcess.session.runProfile))
 					handler.addProcessListener(object : ProcessListener {
 						override fun processTerminated(event: ProcessEvent) {
 							servicesPanel.detach(handler)

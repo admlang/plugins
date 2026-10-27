@@ -89,8 +89,8 @@ class ADMRunConfiguration(
 				val env = LinkedHashMap(effectiveEnv())
 				// The IDE service panel talks to the program over a local TCP
 				// port, which a page cannot open: a web run goes without it.
-				val idePort = if (web) null else org.adm.intellij.ide.ADMInspect.pickFreePort()
-				if (idePort != null) env["ADM_IDE_PORT"] = idePort.toString()
+				val endpoint = if (web) null else org.adm.intellij.ide.ADMInspect.newEndpoint()
+				endpoint?.exportTo(env)
 
 				val cmd = GeneralCommandLine(adm.toString())
 					.withWorkDirectory(workDir)
@@ -100,7 +100,7 @@ class ADMRunConfiguration(
 
 				return try {
 					val handler = KillableProcessHandler(cmd)
-					if (idePort != null) org.adm.intellij.ide.ADMInspect.register(handler, idePort)
+					if (endpoint != null) org.adm.intellij.ide.ADMInspect.register(handler, endpoint)
 					handler
 				} catch (t: Throwable) {
 					log.warn("Failed to start adm process", t)
