@@ -47,6 +47,9 @@ object ADMCodeLenses {
 			// defaulted parameter must not be omitted.
 			server.sendRequestSync(10_000) { ls -> ls.textDocumentService.codeLens(params) }
 		} catch (t: Throwable) {
+			// A cancelled read action or a disposed project arrives as a
+			// control-flow exception the platform expects back, not in the log.
+			if (t is com.intellij.openapi.diagnostic.ControlFlowException) throw t
 			log.warn("textDocument/codeLens failed for $uri", t)
 			return null
 		} ?: return null

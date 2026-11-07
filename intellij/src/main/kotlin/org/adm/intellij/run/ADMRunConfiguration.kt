@@ -39,6 +39,10 @@ class ADMRunConfiguration(
 	var envVars: Map<String, String> = emptyMap()
 	var passParentEnv: Boolean = true
 	var platform: ADMPlatform = ADMPlatform.DEFAULT
+	// How a native `run` follows source changes (--hot, --watch); ignored on
+	// the web, where the program runs once in the browser, and by the Debug
+	// executor, which runs the binary it built under LLDB.
+	var reload: ADMReload = ADMReload.DEFAULT
 
 	/**
      * Environment for the launched process: the ADM tool variables
@@ -72,8 +76,8 @@ class ADMRunConfiguration(
 			Messages.showErrorDialog(project, "ADM run configuration has no arguments.", "ADM")
 			return null
 		}
-		val runArgs = platform.apply(args, envVars)
 		val web = platform == ADMPlatform.WEB
+		val runArgs = platform.apply(if (web) args else reload.apply(args), envVars)
 
 		return object : CommandLineState(environment) {
 			override fun startProcess(): ProcessHandler {
@@ -122,6 +126,7 @@ class ADMRunConfiguration(
 		EnvironmentVariablesComponent.writeExternal(element, envVars)
 		element.setAttribute("admPassParentEnv", passParentEnv.toString())
 		element.setAttribute("admPlatform", platform.id)
+		element.setAttribute("admReload", reload.id)
 	}
 
 	override fun readExternal(element: Element) {
@@ -134,6 +139,7 @@ class ADMRunConfiguration(
 		envVars = loaded
 		passParentEnv = element.getAttributeValue("admPassParentEnv")?.toBooleanStrictOrNull() ?: true
 		platform = ADMPlatform.fromId(element.getAttributeValue("admPlatform"))
+		reload = ADMReload.fromId(element.getAttributeValue("admReload"))
 	}
 
 	private fun writeArgList(element: Element, name: String, values: List<String>) {
@@ -166,6 +172,7 @@ class ADMRunConfiguration(
 		private val appArgsField = RawCommandLineEditor()
 		private val envField = EnvironmentVariablesTextFieldWithBrowseButton()
 		private val platformField = com.intellij.openapi.ui.ComboBox(ADMPlatform.entries.toTypedArray())
+		private val reloadField = com.intellij.openapi.ui.ComboBox(ADMReload.entries.toTypedArray())
 
 		override fun createEditor(): JComponent {
 			workDirField.addBrowseFolderListener(
@@ -241,7 +248,27 @@ class ADMRunConfiguration(
 			platformField.toolTipText = "Native runs on this machine; Web builds with --os wasm, runs the program in the browser (tests in a headless one) and shows its output here."
 			panel.add(platformField, c)
 
+			c.gridx = 0
+			c.gridy = 5
+			c.weightx = 0.0
+			c.fill = java.awt.GridBagConstraints.NONE
+			c.insets = java.awt.Insets(0, 0, 6, 8)
+			panel.add(JLabel("Reload:"), c)
+
+			c.gridx = 1
+			c.weightx = 1.0
+			c.fill = java.awt.GridBagConstraints.NONE
+			reloadField.toolTipText = "For `adm run` on this machine: Hot swaps changed code into the running program (--hot; a change beyond function bodies restarts it), Watch rebuilds and restarts on every change (--watch). A web program runs once in the browser, and the Debug executor runs without reload."
+			panel.add(reloadField, c)
+			// A web build takes neither flag, so the field reads as what will
+			// happen: off and disabled while Web is selected.
+			platformField.addActionListener { syncReloadField() }
+
 			return panel
+		}
+
+		private fun syncReloadField() {
+			reloadField.isEnabled = platformField.selectedItem != ADMPlatform.WEB
 		}
 
 		override fun resetEditorFrom(s: ADMRunConfiguration) {
@@ -251,6 +278,8 @@ class ADMRunConfiguration(
 			envField.envs = s.envVars
 			envField.isPassParentEnvs = s.passParentEnv
 			platformField.selectedItem = s.platform
+			reloadField.selectedItem = s.reload
+			syncReloadField()
 		}
 
 		override fun applyEditorTo(s: ADMRunConfiguration) {
@@ -266,6 +295,7 @@ class ADMRunConfiguration(
 			s.envVars = LinkedHashMap(envField.envs)
 			s.passParentEnv = envField.isPassParentEnvs
 			s.platform = platformField.selectedItem as? ADMPlatform ?: ADMPlatform.DEFAULT
+			s.reload = reloadField.selectedItem as? ADMReload ?: ADMReload.DEFAULT
 		}
 	}
 }
